@@ -1,4 +1,4 @@
-from automata import GameOfLife
+from cellular_automata import GameOfLife
 import pygame
 import pygame.midi
 import numpy as np

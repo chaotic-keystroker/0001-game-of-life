@@ -1,4 +1,4 @@
-from automata import GameOfLife, ToroidalGameOfLife
+from cellular_automata import GameOfLife
 import pygame
 import numpy as np
 import sys
@@ -75,7 +75,7 @@ def main():
     pygame.init()
     W, H = (100, 50)
     # game = GameOfLife(np.zeros((H, W), dtype=bool))
-    game = ToroidalGameOfLife(np.zeros((H, W), dtype=bool))
+    game = GameOfLife(np.zeros((H, W), dtype=bool))
     # game = GameOfLife(np.random.randint(0, 2, (H, W), dtype=bool))
     controler = Controller(game, 20)
     controler.run()
