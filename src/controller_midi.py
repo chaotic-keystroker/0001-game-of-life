@@ -30,29 +30,67 @@ class Controller:
         self.conf = conf
         self.game = game
         pygame.init()
-        self.canvas = pygame.display.set_mode((conf.W * conf.CELL_SIZE, conf.H * conf.CELL_SIZE))
-        pygame.display.set_caption("John Conway's Game of Life")
-        self.clock = pygame.time.Clock()
-
         pygame.midi.init()
         port = pygame.midi.get_default_output_id()
         self.midi_out = pygame.midi.Output(port, 0)
 
+        self.grid_size = conf.W * conf.CELL_SIZE, conf.H * conf.CELL_SIZE
+
+        if conf.FULLSCREEN:
+            self.canvas = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            displayInfo = pygame.display.Info()
+            W, H = displayInfo.current_w, displayInfo.current_h
+            self.grid_offset = (W - conf.W * conf.CELL_SIZE) // 2, (H - conf.H * conf.CELL_SIZE) // 2
+        else:
+            self.grid_offset = conf.CELL_SIZE, conf.CELL_SIZE
+            W, H = self.grid_size[0] + 2*self.grid_offset[0], self.grid_size[1] + 2*self.grid_offset[1]
+            self.canvas = pygame.display.set_mode((W, H))
+        pygame.display.set_caption("John Conway's Game of Life")
+
+        self.clock = pygame.time.Clock()
+
         self.saved_state = game.board.copy()
         self.current_state = np.ones_like(game.board, dtype=bool)
-        self.canvas.fill(self.conf.GRID_COLOR)
+        self.draw_background()
+        self.clock.tick(self.conf.FPS)
         self.draw(np.logical_not(self.current_state))  # empty board
         self.draw()  # draw the initial state
         self.running = False
         self.drawing = False
         self.mouse_cell = (-1, -1)
+
+    def draw_background(self):
+        (x, y), (w, h) = self.grid_offset, self.grid_size
+
+        self.canvas.fill([0, 0, 0])
+        pygame.display.update()
+        pygame.draw.rect(
+            self.canvas, 
+            self.conf.GRID_COLOR,
+            (x, y, w, h),
+        )
+        
+        S = self.conf.GAP * 2
+        pygame.draw.lines(
+            self.canvas, 
+            (255, 255, 255), 
+            True,
+            ((x-S, y-S), (x-S, y+h),(x+w, y+h),(x+w, y-S)),
+            S,
+        )
+        pygame.display.update()
     
     def quit(self):
+        self.silence()
+        self.midi_out.abort()
+        self.midi_out.close()
+        pygame.midi.quit()
         pygame.quit()
         sys.exit(0)
     
     def draw(self, board=None):
         board = board if board is not None else self.game.board
+        ox, oy = self.grid_offset
         S, G = self.conf.CELL_SIZE, self.conf.GAP
         msg = [self.midi_out.note_off, self.midi_out.note_on]
 
@@ -61,15 +99,21 @@ class Controller:
             msg[board[y, x]](note=x%128, velocity=(127-y)%128, channel=0)
             pygame.draw.rect(
                 self.canvas, 
-                self.conf.DEAD_LIVE_COLOR[board[y, x]],
-                (x*S, y*S, S-G, S-G),
+                self.conf.DEAD_LIVE_COLOR[int(board[y, x])],
+                (ox+x*S, oy+y*S, S-G, S-G),
                 )
         self.current_state = board.copy()
         pygame.display.update()
 
     def get_cell(self):
         x, y = pygame.mouse.get_pos()
-        return x // self.conf.CELL_SIZE, y // self.conf.CELL_SIZE
+        x = (x - self.grid_offset[0]) // self.conf.CELL_SIZE
+        y = (y - self.grid_offset[1]) // self.conf.CELL_SIZE
+        return x, y
+    
+    def silence(self):
+        for i in range(128):
+            self.midi_out.note_off(note=i, velocity=127, channel=0)
     
     def control(self, event):
         if event.type == pygame.QUIT:
@@ -84,28 +128,29 @@ class Controller:
             elif event.key == pygame.K_RIGHT:
                 self.step()
             elif event.key == pygame.K_c:
-                for i in range(128):
-                    self.midi_out.note_off(note=i, velocity=127, channel=0)
+                self.silence()
                 self.game.clear()
                 self.draw()
             elif event.key == pygame.K_r:
                 self.game.board = self.saved_state.copy()
                 self.draw()
-        elif event.type == pygame.K_s:
-            if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                filename = f"game_of_life_{datetime.datetime.now().isoformat()}.npy"
-                self.game.save(filename)
-                print(f'saved as: "{filename}"')
+            elif event.key == pygame.K_s:
+                if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    filename = f"game_of_life_{datetime.datetime.now().isoformat()}.npy"
+                    self.game.save(filename)
+                    print(f'saved as: "{filename}"')
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 self.drawing = True
-                x, y = self.get_cell()
-                self.game.toggle_cell(x, y)
                 self.draw()
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
                 self.drawing = False
-                self.draw()
+                cell = self.get_cell()
+                if cell != self.mouse_cell:
+                    self.game.toggle_cell(*cell)
+                    self.draw()
+                self.mouse_cell = (-1, -1)
         elif event.type == pygame.MOUSEMOTION:
             if self.drawing:
                 cell = self.get_cell()
@@ -129,7 +174,6 @@ class Controller:
 def main():
     with open("src/config.yaml", "r") as f:
         config = AttrDict(yaml.safe_load(f))
-    # board = np.random.randint(0, 2, size=(config.H, config.W))
     board = np.zeros((config.H, config.W), dtype=bool)
     game = GameOfLife(board)
     controller = Controller(game, config)

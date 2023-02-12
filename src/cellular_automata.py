@@ -9,8 +9,14 @@ class GameOfLife:
         # convolution kernel - counts the number of alive neighbors
         self._kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
     
+    @staticmethod
+    def from_file(filename):
+        with open(filename, "rb") as f:
+            board = np.load(f)
+        return GameOfLife(board)
+    
     def step(self):
-        # wrap maked the board toroidal - the edges are connected
+        # wrap makes the board toroidal - the edges are connected
         board = np.pad(self.board, 1, mode='wrap')
         cnt = scipy.signal.convolve2d(board, self._kernel, mode='valid')
         # Any live cell with two or three live neighbours survives.
@@ -23,6 +29,10 @@ class GameOfLife:
     
     def toggle_cell(self, x, y):
         self.board[y, x] = not self.board[y, x]
+    
+    def save(self, filename):
+        with open("filename", "wb") as f:
+            np.save(filename, self.board)
     
     def __str__(self):
         arr = np.where(self.board, '#', ' ')
