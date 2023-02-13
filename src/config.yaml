@@ -1,0 +1,8 @@
+W: 125   # width
+H: 70   # height
+FPS: 30
+GRID_COLOR: [30, 30, 30]
+DEAD_LIVE_COLOR: [[0, 0, 0], [255, 255, 255]]
+CELL_SIZE: 20           # cell size
+GAP: 1                  # gap between cells
+FULLSCREEN: True
