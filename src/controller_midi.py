@@ -13,8 +13,9 @@ Controls:
     SPACE - pause/resume
     RIGHT - step
     c - clear
-    r - load saved state (before SPACE)
+    r - load last saved state (before SPACE)
     q - quit
+    CTRL + S - save the current state as as file
     ESC - quit
     mouse - toggle cell, draw
 """
@@ -176,6 +177,7 @@ def main():
         config = AttrDict(yaml.safe_load(f))
     board = np.zeros((config.H, config.W), dtype=bool)
     game = GameOfLife(board)
+    game = GameOfLife.from_file("thank_you.npy")
     controller = Controller(game, config)
     controller.run()
 

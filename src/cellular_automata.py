@@ -31,7 +31,7 @@ class GameOfLife:
         self.board[y, x] = not self.board[y, x]
     
     def save(self, filename):
-        with open("filename", "wb") as f:
+        with open(filename, "wb") as f:
             np.save(filename, self.board)
     
     def __str__(self):
